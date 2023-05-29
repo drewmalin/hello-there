@@ -1,0 +1,83 @@
+#!/bin/bash
+
+##
+# Simple build script.
+#
+# To build in 'release' mode:
+#   ./build
+#
+# To build in 'debug' mode:
+#   MODE=debug ./build
+#
+# To override the target binary:
+#   TARGET=foo ./build
+#
+# To override all the things (e.g. build a C++ project):
+#   TARGET=foo MODE=debug EXT_SRC=cpp ./build
+##
+
+TARGET="${TARGET:-bin}"
+
+# Directories
+DIR_SRC=src
+DIR_INCLUDE=${DIR_SRC}/include
+DIR_LIB=${DIR_SRC}/lib
+DIR_BUILD=obj
+DIR_BIN=bin
+
+# Extensions
+EXT_SRC="${EXT_SRC:-c}"
+EXT_OBJ=o
+
+# Compiler options
+CC=clang
+CFLAGS=$(case "${MODE}" in
+  (debug)   echo "-Wall -Wextra -std=c2x -pedantic -g3 -glldb";;
+  (*)       echo "-Wall -Wextra -std=c2x -pedantic";;
+esac)
+LDFLAGS=""
+
+##
+# Compilation:
+#
+# For each source file, 'src_file':
+#   1. Build a filepath representing its corresponding object file 'obj_file'
+#   2. Create the 'obj_file' path if it does not exist
+#   3. Compile 'src_file' into 'obj_file'
+##
+SOURCES=$(find ${DIR_SRC} -type f -name *.${EXT_SRC})
+for src_file in ${SOURCES}; do
+    ##
+    # Replace "src/..." with "obj/..."
+    #
+    obj_file=${src_file/"${DIR_SRC}"/"${DIR_BUILD}"}
+
+    ##
+    # Replace "...c" with "....o"
+    #
+    obj_file=${obj_file/".${EXT_SRC}"/".${EXT_OBJ}"}
+
+    ##
+    # Compile this file into a .o file, preserving its local path
+    #
+    mkdir -p $(dirname ${obj_file})
+    (
+        # The '( set -x; ... )' prints the command as it runs (to aid in visibility)
+        set -x;
+        ${CC} ${CFLAGS} -I${DIR_SRC}/include -c ${src_file} -o ${obj_file}
+    )
+done
+
+##
+# Linking into an executable, 'target':
+# 1. Gather all object files
+# 2. Create the DIR_BIN if it does not exist
+# 3. Link all object files into the 'target' binary
+#
+OBJECTS=$(find ${DIR_BUILD} -type f -name *.${EXT_OBJ})
+mkdir -p ${DIR_BIN}
+(
+    # The '( set -x; ... )' prints the command as it runs (to aid in visibility)
+    set -x;
+    ${CC} ${LDFLAGS} -o ${DIR_BIN}/${TARGET} ${OBJECTS}
+)

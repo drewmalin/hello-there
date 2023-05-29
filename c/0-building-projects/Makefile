@@ -3,6 +3,7 @@ TARGET = hello
 SRCDIR   := src
 BUILDDIR := obj
 BINDIR   := bin
+
 SRCEXT := c
 OBJEXT := o
 
