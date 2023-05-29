@@ -1,3 +1,5 @@
 *.o
 **/bin/*
 **/opt/*
+**/zig-cache/*
+**/zig-out/*

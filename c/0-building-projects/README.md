@@ -97,3 +97,50 @@
 ### Cons:
 * You control your own destiny!
 * Unless you want to start re-implementing `make`, you'll be re-compiling on every build. Note: while this was definitely considered a bad practice in the 1970s, I wonder how big of an issue that is in the modern era...
+
+## Zig
+
+### Prerequisites:
+
+https://ziglang.org/
+
+### Usage:
+
+**Release**
+
+```
+> zig build
+> ./zig-out/bin/hello
+```
+
+**Debug**
+
+*Emits debug events to allow for GDB/LLDB debugging*
+
+```
+> zig build -Doptimize=Debug
+> ./zig-out/bin/hello
+```
+
+**Clean**
+
+```
+> zig build uninstall
+```
+
+**Purge**
+
+*Up to you!*
+
+```
+> rm -rf zig-out zig-cache
+```
+
+### Pros:
+* I have a soft spot for `zig`
+* Much better syntax than `bash` or `make`, supports cross-compilation, several flavors of release optimizations, and much more
+* Allows for custom build steps (like phony make targets, only official commands)
+
+### Cons:
+* `zig` is pre-1.0, and is therefore under rapid change (read: `zig build` has changed in a breaking way more than once on me)
+* Not very google-able, and even the official learning docs (https://ziglearn.org) or blogs written by core contributors to `zig` (https://zig.news/kristoff/make-zig-your-c-c-build-system-28g5) tend to be out of date
