@@ -137,8 +137,8 @@ https://ziglang.org/
 ```
 
 ### Pros:
-* I have a soft spot for `zig`
-* Much better syntax than `bash` or `make`, supports cross-compilation, several flavors of release optimizations, and much more
+* More code-like syntax than `bash` or `make`
+* Supports cross-compilation, several flavors of release optimizations, and much more
 * Allows for custom build steps (like phony make targets, only official commands)
 
 ### Cons:
