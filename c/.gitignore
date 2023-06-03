@@ -3,3 +3,4 @@
 **/opt/*
 **/zig-cache/*
 **/zig-out/*
+**/.vscode/*
