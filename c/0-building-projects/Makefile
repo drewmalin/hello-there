@@ -1,8 +1,9 @@
 TARGET = hello
 
-SRCDIR   := src
-BUILDDIR := obj
-BINDIR   := bin
+SRCDIR     := src
+INCLUDEDIR := include
+BUILDDIR   := obj
+BINDIR     := bin
 
 SRCEXT := c
 OBJEXT := o
@@ -34,7 +35,7 @@ debug: clean ${TARGET}
 #
 ${BUILDDIR}/%.${OBJEXT}: ${SRCDIR}/%.${SRCEXT}
 		@mkdir -p $(dir $@)
-		${CC} ${CFLAGS} -I${SRCDIR}/include -c $< -o $@
+		${CC} ${CFLAGS} -I${INCLUDEDIR} -c $< -o $@
 
 ##
 # Linking.

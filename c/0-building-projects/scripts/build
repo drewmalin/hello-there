@@ -20,8 +20,7 @@ TARGET="${TARGET:-bin}"
 
 # Directories
 DIR_SRC=src
-DIR_INCLUDE=${DIR_SRC}/include
-DIR_LIB=${DIR_SRC}/lib
+DIR_INCLUDE=include
 DIR_BUILD=obj
 DIR_BIN=bin
 
@@ -64,7 +63,7 @@ for src_file in ${SOURCES}; do
     (
         # The '( set -x; ... )' prints the command as it runs (to aid in visibility)
         set -x;
-        ${CC} ${CFLAGS} -I${DIR_SRC}/include -c ${src_file} -o ${obj_file}
+        ${CC} ${CFLAGS} -I${DIR_INCLUDE} -c ${src_file} -o ${obj_file}
     )
 done
 
