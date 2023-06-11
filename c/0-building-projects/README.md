@@ -144,3 +144,45 @@ https://ziglang.org/
 ### Cons:
 * `zig` is pre-1.0, and is therefore under rapid change (read: `zig build` has changed in a breaking way more than once on me)
 * Not very google-able, and even the official learning docs (https://ziglearn.org) or blogs written by core contributors to `zig` (https://zig.news/kristoff/make-zig-your-c-c-build-system-28g5) tend to be out of date
+
+## Python
+
+Inspired by an old college assignment, why not create a script that creates a Makefile? Makemake!
+
+### Usage:
+
+**Simple**
+```
+python3 makemake.py
+> make
+> ./bin/main.out
+```
+
+**Fancy**
+```
+> python3 makemake.py \
+  --srcdir=src \
+  --builddir=obj \
+  --bindir=bin \
+  --srcext=c \
+  --cc=clang \
+  --main=main.c \
+  --out=hello \
+  --mode=DEBUG
+> make
+> ./bin/hello
+```
+
+**Test, Debug, and Release**
+```
+> python3 makemake.py --makefile=Makefile.test --main=tests/test_foo.c --out=test
+> python3 makemake.py --makefile=Makefile.debug --mode=DEBUG --builddir=debug --out=debug
+> python3 makemake.py --out=release
+```
+
+Pros:
+* Follows .h file declarations to produce intermediary targets for the final Makefile
+* Fairly simple code (thanks, Python!) that can generate very "standard" Makefiles
+
+Cons:
+* Complexity of the script rises with the complexity of the project
