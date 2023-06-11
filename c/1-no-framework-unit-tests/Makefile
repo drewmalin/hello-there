@@ -21,25 +21,29 @@ bin/main.out : obj/main.o
 	@mkdir -p bin
 	${CC} ${LDFLAGS} -o bin/main.out obj/main.o
 
-bin/test_foo.out : obj/test_foo.o obj/foo/foo.o
+bin/test_foo.out : obj/foo/foo.o obj/test_foo.o
 	@mkdir -p bin
-	${CC} ${LDFLAGS} -o bin/test_foo.out obj/test_foo.o obj/foo/foo.o
+	${CC} ${LDFLAGS} -o bin/test_foo.out obj/foo/foo.o obj/test_foo.o
 
 ###
 # Intermediary objects:
 ###
 
-obj/test_foo.o : tests/test_foo.c
-	@mkdir -p $(dir obj/test_foo.o)
-	${CC} ${CFLAGS} -Iinclude -c tests/test_foo.c -o obj/test_foo.o
-
-obj/main.o : src/main.c
+obj/main.o : src/main.c 
 	@mkdir -p $(dir obj/main.o)
 	${CC} ${CFLAGS} -Iinclude -c src/main.c -o obj/main.o
 
-obj/foo/foo.o : src/foo/foo.c
+obj/foo/foo.o : src/foo/foo.c include/foo/foo.h
 	@mkdir -p $(dir obj/foo/foo.o)
 	${CC} ${CFLAGS} -Iinclude -c src/foo/foo.c -o obj/foo/foo.o
+
+obj/test_foo.o : tests/test_foo.c include/foo/foo.h
+	@mkdir -p $(dir obj/test_foo.o)
+	${CC} ${CFLAGS} -Iinclude -c tests/test_foo.c -o obj/test_foo.o
+
+###
+# Phony targets:
+###
 
 .PHONY : clean
 clean :

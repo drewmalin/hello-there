@@ -19,6 +19,11 @@ OBJECTS_COMMENT = """###
 ###
 """
 
+PHONIES_COMMENT = """###
+# Phony targets:
+###
+"""
+
 REGEX_POUND_INCLUDE = re.compile("#include\s\"(.*)\"")
 
 MAIN = "main.c"
@@ -82,6 +87,9 @@ def main(argv):
     argParser.add_argument("--builddir",
                            default=BUILDDIR,
                            help=f"Directory for intermediary build files (defaults to: {BUILDDIR})")
+    argParser.add_argument("--includedir",
+                           default=INCLUDEDIR,
+                           help=f"Directory for included header files (defaults to: {INCLUDEDIR})")
     argParser.add_argument("--srcext",
                            default=SRCEXT,
                            help=f"Extension for all source files (defaults to: {SRCEXT})")
@@ -99,28 +107,35 @@ def main(argv):
     makemake(args)
 
 ##
-# Entrypoint.
+# Entrypoint. Generates the Makefile using the provided arguments, writing the final output to the filesystem.
 #
 def makemake(args):
     header = make_header(args)
-    linker_target = make_linker_target(args)
+    linker_target = make_linker_targets(args)
     object_targets = make_object_targets(args)
-    static_targets = make_static_targets(args)
+    phony_targets = make_phony_targets(args)
     
     if args.verbose:
-        out = header + linker_target + '\n'.join(t for t in object_targets) + static_targets
+        out = header + linker_target + '\n'.join(t for t in object_targets) + phony_targets
         debug("makemake", "", out)
     
     with open(args.makefile, 'w') as out:
         out.write(f'{HEADER_COMMENT}\n')
         out.write(header)
+
         out.write(f'{TARGETS_COMMENT}\n')
         out.write(linker_target)
+        
         out.write(f'{OBJECTS_COMMENT}\n')
         for t in object_targets:
             out.write(t + '\n')
-        out.write(static_targets)
+        
+        out.write(f'{PHONIES_COMMENT}\n')
+        out.write(phony_targets)
 
+##
+# Creates the header section of the Makefile. This section consists mainly of arguments.
+#
 def make_header(args):
     cflags = args.cflags + " " + DBFLAGS if args.mode == MODE_DEBUG else args.cflags
 
@@ -134,11 +149,24 @@ def make_header(args):
     return out
 
 ##
-# Creates a make target for the final linking step for this project. Usually a project has only one entrypoint, but in the
-# event that more than one exist (say, one for a CLI, one for a server, or one for tests) then each can be specified and
-# passed to this function. For each entrypoint, a binary is linked.
+# Creates a target for each specified entrypoint in 'args.mains'.
+# 
+# Usually a project has only one entrypoint, but in the event that more than one exist (say, one for a CLI, one for a server, 
+# or one for tests) then each entrypoint can be specified via a command line argument. For each entrypoint, a binary is linked.
 #
-def make_linker_target(args):
+# The general shape of the return of this function is as follows:
+#
+# all: <target1> <target2> ...
+#
+# <target1.out> : <target1.o>
+#   ${CC} ${LDFLAGS} -o <target1.out> <target1.o>
+#
+# <target2.out> : <target2.o>
+#   ${CC} ${LDFLAGS} -o <target2.out> <target2.o>
+#
+# ...
+#
+def make_linker_targets(args):
     all = []
     out = ""
     
@@ -174,22 +202,27 @@ def make_linker_target(args):
     return f'all: {" ".join(all)}\n\n{out}'
 
 ##
-# Creates a make target for all source files referenced from the main file in this project. Beginning with the main
-# file, a make target is created for each included header file. Each header file is assumed to correspond to a local
-# source file, meaning each header file will be used to generate an object file which depends upon this source file
-# and all denoted header files.
+# Creates a target for all source files referenced from each specified entrypoint in this project.
 # 
+# Targets are only created if they directly or indirectly lead to the generation of the targets specified via command line arguments. This
+# means that if a particular source file is not used, it will not be incorporated into a target. "Use" is determined by a walk through the
+# "#include" directives in each source file, starting with those specified as entrypoints.
+#
 # See 'make_object_target'
 def make_object_targets(args):
     targets = set()
     todo_headers = set()
 
-    # Begin with the main file and crawl the "includes" tree
+    # In order to begin, the "root" source files are first inspected, and their corresponding targets are generated. In this case, "root"
+    # simply implies that the source file was explicitly denoted as being an entrypoint via the "args.mains" command line argument.
     for main in args.mains:
         main_headers, target = make_object_target(main, args)
         targets.add(target)
         todo_headers.update(main_headers)
 
+    # At this point, "todo_headers" contains a list of .h files found to be "#include"-ed by the entrypoint sources. Loop through these,
+    # walking to their corresponding source files, and generating object targets for each. Every time a new "#include" is found, store it
+    # back in "todo_headers" for continued calculation (but only do so if we have never seen that .h file before).
     completed_headers = set()
     while len(todo_headers) > 0:
 
@@ -198,11 +231,11 @@ def make_object_targets(args):
         source = header_to_source(header, args)
         completed_headers.add(header)
         
+        # The target has been generated, store it for eventual return by this function
         next_headers, target = make_object_target(source, args)
         targets.add(target)
 
-        # For all included headers of the just-finished file, only maintain those which we have not yet
-        # processed.
+        # For all included headers of the just-finished file, only maintain those which we have not yet processed.
         for h in next_headers:
             if h in completed_headers:
                 continue
@@ -215,10 +248,9 @@ def make_object_targets(args):
     return targets
 
 ##
-# Creates a make target for the provided header filepath. The filepath is expected to be in the form that would
-# be seen in a C or C++ file, meaning it is not a complete directory (notably it should be missing a leading "src/"
-# if appropriate). Given this header file, two outputs are generated: the list of header files that this file's
-# source includes (so that further targets may be made) and the final target string itself.
+# Creates a target for the provided source filepath. For every header file found to be a dependency of this source file (determined
+# simply by its inclusion in a "#include" directive) return the set of headers for later processing. The target and set of headers
+# are collected into a tuple that is returned by this function.
 #
 # Example:
 #
@@ -237,10 +269,15 @@ def make_object_target(source_file, args):
     object_file = source_to_object(source_file, args)
     headers = get_included_headers(source_file, args)
 
+    # Include all discovered header files as being dependencies of this source file
+    header_dependencies = set()
+    for header in headers:
+        header_dependencies.add(f'{args.includedir}/{header}')
+
     out = (
-        f'{object_file} : {source_file}\n'
+        f'{object_file} : {source_file} {" ".join(header_dependencies)}\n'
         f'\t@mkdir -p $(dir {object_file})\n'
-        f'\t${{CC}} ${{CFLAGS}} -I{INCLUDEDIR} -c {source_file} -o {object_file}\n'
+        f'\t${{CC}} ${{CFLAGS}} -I{args.includedir} -c {source_file} -o {object_file}\n'
     )
 
     if args.verbose:
@@ -251,7 +288,7 @@ def make_object_target(source_file, args):
 ##
 # Creates static targets that always exist regardless of the source tree (a typical example is the 'clean' target).
 #
-def make_static_targets(args):
+def make_phony_targets(args):
     target_clean = (
         f'.PHONY : clean\n'
         f'clean :\n'
@@ -294,8 +331,9 @@ def get_included_headers(filepath, args):
     return includes
 
 ##
-# Returns a string representing the provided filepath with the header extension replaced by the
-# object extension.
+# Returns a string representing the provided header filepath (expected to be in the form that would be found in a source file,
+# e.g.: "foo/bar.h") with an equivalent filepath representing this header's source's object file. This path is expected to
+# be a complete and valid filepath, and will include the "args.builddir" value as its parent directory.
 #
 # Example:
 #
@@ -314,8 +352,9 @@ def header_to_object(filepath, args):
     return out
 
 ##
-# Returns a string representing the provided filepath with the header extension replaced by the
-# source extension.
+# Returns a string representing the provided header filepath (expected to be in the form that would be found in a source file,
+# e.g.: "foo/bar.h") with an equivalent filepath representing this header's source file. This path is expected to
+# be a complete and valid filepath, and will include the "args.srcdir" value as its parent directory.
 #
 # Example:
 #
@@ -334,8 +373,28 @@ def header_to_source(filepath, args):
     return out
 
 ##
-# Returns a string representing the provided filepath with the source extension replaced by the
-# object extension.
+# Returns a string representing the provided source filepath with an equivalent filepath representing this file's header file. 
+# This path is expected to be a complete and valid filepath, and will include the "args.includedir" value as its parent directory.
+#
+# Example:
+#
+# srcext = c
+# hdrext = h
+#
+# header_to_source("src/foo/bar.c", args) => "include/foo/bar.h"
+#
+def source_to_header(filepath, args):
+    out = filepath.replace(args.srcext, args.hdrext)
+    out = re.sub(r'^.*?\/', f'{args.includedir}/', out)
+
+    if args.verbose:
+        debug("source_to_header", filepath, out)
+
+    return out
+
+##
+# Returns a string representing the provided source filepath with an equivalent filepath representing this file's object file. 
+# This path is expected to be a complete and valid filepath, and will include the "args.builddir" value as its parent directory.
 #
 # Example:
 #
@@ -354,13 +413,13 @@ def source_to_object(filepath, args):
     return out
 
 ##
-# Returns a string representing the provided filepath with the source extension replaced by the
-# out extension.
+# Returns a string representing the provided source filepath with an equivalent filepath representing this file's out file. 
+# This path is expected to be a complete and valid filepath, and will include the "args.bindir" value as its parent directory.
 #
 # Example:
 #
 # srcext = c
-# objext = o
+# outext = out
 #
 # source_to_out("src/foo/bar.c", args) => "bin/foo/bar.out"
 #
