@@ -166,7 +166,7 @@ python3 makemake.py
   --bindir=bin \
   --srcext=c \
   --cc=clang \
-  --main=main.c \
+  --mains src/main.c \
   --out=hello \
   --mode=DEBUG
 > make
@@ -174,10 +174,13 @@ python3 makemake.py
 ```
 
 **Test, Debug, and Release**
+
+Note that more than one main can be specified, which will generate more than one target binary:
+
 ```
-> python3 makemake.py --makefile=Makefile.test --main=tests/test_foo.c --out=test
-> python3 makemake.py --makefile=Makefile.debug --mode=DEBUG --builddir=debug --out=debug
-> python3 makemake.py --out=release
+> python3 makemake.py --makefile=Makefile.test --mode=DEBUG --mains tests/test_foo.c src/main.c
+> ./bin/main.out
+> ./bin/test_foo.out
 ```
 
 Pros:

@@ -5,15 +5,25 @@
 ###
 
 CC      := clang
-CFLAGS  := -Wall -Wextra -std=c2x -pedantic
+CFLAGS  := -Wall -Wextra -std=c2x -pedantic -g3 -glldb
 LDFLAGS := 
 
-.DEFAULT_GOAL: bin/main.out
+.DEFAULT_GOAL: all
 
+
+###
+# Targets:
+###
+
+all: bin/main.out
 
 bin/main.out : obj/main.o obj/geometry/point.o
 	@mkdir -p bin
 	${CC} ${LDFLAGS} -o bin/main.out obj/main.o obj/geometry/point.o
+
+###
+# Intermediary objects:
+###
 
 obj/main.o : src/main.c
 	@mkdir -p $(dir obj/main.o)

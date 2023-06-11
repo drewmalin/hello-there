@@ -8,16 +8,38 @@ CC      := clang
 CFLAGS  := -Wall -Wextra -std=c2x -pedantic
 LDFLAGS := 
 
-.DEFAULT_GOAL: bin/main
+.DEFAULT_GOAL: all
 
 
-bin/main : obj/main.o
+###
+# Targets:
+###
+
+all: bin/main.out bin/test_foo.out
+
+bin/main.out : obj/main.o
 	@mkdir -p bin
-	${CC} ${LDFLAGS} -o bin/main obj/main.o
+	${CC} ${LDFLAGS} -o bin/main.out obj/main.o
+
+bin/test_foo.out : obj/test_foo.o obj/foo/foo.o
+	@mkdir -p bin
+	${CC} ${LDFLAGS} -o bin/test_foo.out obj/test_foo.o obj/foo/foo.o
+
+###
+# Intermediary objects:
+###
+
+obj/test_foo.o : tests/test_foo.c
+	@mkdir -p $(dir obj/test_foo.o)
+	${CC} ${CFLAGS} -Iinclude -c tests/test_foo.c -o obj/test_foo.o
 
 obj/main.o : src/main.c
 	@mkdir -p $(dir obj/main.o)
 	${CC} ${CFLAGS} -Iinclude -c src/main.c -o obj/main.o
+
+obj/foo/foo.o : src/foo/foo.c
+	@mkdir -p $(dir obj/foo/foo.o)
+	${CC} ${CFLAGS} -Iinclude -c src/foo/foo.c -o obj/foo/foo.o
 
 .PHONY : clean
 clean :

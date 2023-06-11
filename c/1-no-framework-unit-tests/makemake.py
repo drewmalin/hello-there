@@ -9,6 +9,16 @@ HEADER_COMMENT = """###
 ###
 """
 
+TARGETS_COMMENT = """###
+# Targets:
+###
+"""
+
+OBJECTS_COMMENT = """###
+# Intermediary objects:
+###
+"""
+
 REGEX_POUND_INCLUDE = re.compile("#include\s\"(.*)\"")
 
 MAIN = "main.c"
@@ -23,6 +33,7 @@ BINDIR     = "bin"
 SRCEXT = "c"
 OBJEXT = "o"
 HDREXT = "h"
+OUTEXT = "out"
 
 CC      = "clang"
 CFLAGS  = "-Wall -Wextra -std=c2x -pedantic"
@@ -40,8 +51,10 @@ def main(argv):
                            action="store_true", 
                            help="Verbose output")
     argParser.add_argument("-m", 
-                           "--main", 
-                           default=f'{SRCDIR}/{MAIN}',
+                           "--mains", 
+                           nargs="+",
+                           action="extend",
+                           type=str,
                            help=f"Main file (defaults to: {SRCDIR}/{MAIN})")
     argParser.add_argument("-o", 
                            "--out", 
@@ -99,9 +112,11 @@ def makemake(args):
         debug("makemake", "", out)
     
     with open(args.makefile, 'w') as out:
+        out.write(f'{HEADER_COMMENT}\n')
         out.write(header)
+        out.write(f'{TARGETS_COMMENT}\n')
         out.write(linker_target)
-        out.write('\n')
+        out.write(f'{OBJECTS_COMMENT}\n')
         for t in object_targets:
             out.write(t + '\n')
         out.write(static_targets)
@@ -110,43 +125,53 @@ def make_header(args):
     cflags = args.cflags + " " + DBFLAGS if args.mode == MODE_DEBUG else args.cflags
 
     out = (
-        f'{HEADER_COMMENT}\n'
         f'CC      := {args.cc}\n'
         f'CFLAGS  := {cflags}\n'
         f'LDFLAGS := {args.ldflags}\n'
-        f'\n.DEFAULT_GOAL: {args.bindir}/{args.out}\n\n'
+        f'\n.DEFAULT_GOAL: all\n\n'
         '\n'
     )
     return out
 
 ##
-# Creates a make target for the final linking step for this project.
+# Creates a make target for the final linking step for this project. Usually a project has only one entrypoint, but in the
+# event that more than one exist (say, one for a CLI, one for a server, or one for tests) then each can be specified and
+# passed to this function. For each entrypoint, a binary is linked.
 #
 def make_linker_target(args):
-    main_object_files = set()
+    all = []
+    out = ""
     
-    # The final target always directly depends upon 'main'!
-    main_object_file = source_to_object(args.main, args)
-    main_object_files.add(main_object_file)
+    for main in args.mains:
+        main_object_files = set()
+        
+        # The final target always directly depends upon itself (or at least, its source representation)!
+        main_object_file = source_to_object(main, args)
+        main_object_files.add(main_object_file)
 
-    # Generate all dependencies of 'main'
-    main_includes = get_included_headers(args.main, args)
-    for h in main_includes:
-        main_object_files.add(header_to_object(h, args))
-    
-    main_object_files_string = ' '.join(main_object_files)
+        # Generate all #included dependencies of 'main'
+        main_includes = get_included_headers(main, args)
+        for h in main_includes:
+            main_object_files.add(header_to_object(h, args))
+        
+        main_object_files_string = ' '.join(main_object_files)
+        main_out = source_to_out(main, args)
 
-    # Build the target for the final binary (linker step)
-    out = (
-        f'{args.bindir}/{args.out} : {main_object_files_string}\n'
-        f'\t@mkdir -p {args.bindir}\n'
-        f'\t${{CC}} ${{LDFLAGS}} -o {args.bindir}/{args.out} {main_object_files_string}\n'
-    )
+        # Maintain a list of all targets for later
+        all.append(main_out)
+
+        # Build the target for the final binary (linker step)
+        out = out + (
+            f'{main_out} : {main_object_files_string}\n'
+            f'\t@mkdir -p {args.bindir}\n'
+            f'\t${{CC}} ${{LDFLAGS}} -o {main_out} {main_object_files_string}\n'
+            f'\n'
+        )
 
     if args.verbose:
         debug("make_main_target", "", out)
 
-    return out
+    return f'all: {" ".join(all)}\n\n{out}'
 
 ##
 # Creates a make target for all source files referenced from the main file in this project. Beginning with the main
@@ -157,12 +182,14 @@ def make_linker_target(args):
 # See 'make_object_target'
 def make_object_targets(args):
     targets = set()
+    todo_headers = set()
 
     # Begin with the main file and crawl the "includes" tree
-    main_headers, target = make_object_target(args.main, args)
-    targets.add(target)
-    todo_headers = main_headers
-    
+    for main in args.mains:
+        main_headers, target = make_object_target(main, args)
+        targets.add(target)
+        todo_headers.update(main_headers)
+
     completed_headers = set()
     while len(todo_headers) > 0:
 
@@ -323,6 +350,26 @@ def source_to_object(filepath, args):
 
     if args.verbose:
         debug("source_to_object", filepath, out)
+
+    return out
+
+##
+# Returns a string representing the provided filepath with the source extension replaced by the
+# out extension.
+#
+# Example:
+#
+# srcext = c
+# objext = o
+#
+# source_to_out("src/foo/bar.c", args) => "bin/foo/bar.out"
+#
+def source_to_out(filepath, args):
+    out = filepath.replace(args.srcext, OUTEXT)
+    out = re.sub(r'^.*?\/', f'{args.bindir}/', out)
+
+    if args.verbose:
+        debug("source_to_out", filepath, out)
 
     return out
 
